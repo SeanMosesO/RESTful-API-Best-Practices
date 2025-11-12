@@ -1,0 +1,13 @@
+extends: ["spectral:oas", "spectral:asyncapi"]
+rules:
+  info-contact:
+    description: Info object should contain contact details
+    given: $.info
+    then:
+      field: contact
+      function: truthy
+  operation-2xx-response:
+    description: Operations must have a 2xx response
+    given: $.paths[*][*]
+    then:
+      function: truthy

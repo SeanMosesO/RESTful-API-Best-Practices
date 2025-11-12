@@ -1,0 +1,235 @@
+openapi: 3.0.3
+info:
+  title: Example API (Starter)
+  version: 1.0.0
+  description: "Starter OpenAPI 3.0 specification demonstrating best-practices: versioning, pagination, errors, security, ETag, and idempotency."
+servers:
+  - url: https://api.example.com/v1
+    description: Production server
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        status:
+          type: integer
+          example: 400
+        code:
+          type: string
+          example: validation_error
+        message:
+          type: string
+          example: "Invalid request"
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              message:
+                type: string
+        request_id:
+          type: string
+          example: req_abc123
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "123"
+        email:
+          type: string
+          format: email
+          example: "alice@example.com"
+        name:
+          type: string
+          example: "Alice"
+        created_at:
+          type: string
+          format: date-time
+          example: "2025-11-12T13:45:30Z"
+      required: [id, email, created_at]
+    UsersList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/User'
+        meta:
+          type: object
+          properties:
+            limit:
+              type: integer
+            next:
+              type: string
+            prev:
+              type: string
+paths:
+  /users:
+    get:
+      summary: List users (cursor pagination)
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 25
+            maximum: 100
+        - in: query
+          name: cursor
+          schema:
+            type: string
+        - in: header
+          name: X-Request-Id
+          schema:
+            type: string
+          required: false
+      responses:
+        '200':
+          description: A paginated list of users
+          headers:
+            X-Request-Id:
+              description: Request identifier for tracing
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsersList'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+        - BearerAuth: []
+    post:
+      summary: Create a user (idempotent when Idempotency-Key provided)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+              required: [email, password]
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          schema:
+            type: string
+          description: "Clients MAY provide this to make the request idempotent"
+      responses:
+        '201':
+          description: Created
+          headers:
+            Location:
+              description: URL of newly created user
+              schema:
+                type: string
+            X-Request-Id:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /users/{userId}:
+    parameters:
+      - in: path
+        name: userId
+        required: true
+        schema:
+          type: string
+    get:
+      summary: Get a user
+      parameters:
+        - in: header
+          name: If-None-Match
+          schema:
+            type: string
+          description: ETag value from previous response to enable conditional GET
+      responses:
+        '200':
+          description: User found
+          headers:
+            ETag:
+              description: Entity tag for conditional requests
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '304':
+          description: Not Modified
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+        - BearerAuth: []
+    patch:
+      summary: Update a user (partial update)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+              required: []
+      responses:
+        '200':
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict (e.g., concurrent modification)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      summary: Delete a user
+      responses:
+        '204':
+          description: Deleted
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+security:
+  - BearerAuth: []

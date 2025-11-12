@@ -1,0 +1,125 @@
+openapi: 3.0.3
+info:
+  title: Project Management API - Custom Actions
+  version: v1
+  description: Defines non-CRUD custom actions like generating long-running reports.
+
+paths:
+  /v1/reports:
+    post:
+      tags:
+        - Reports
+      summary: Initiates a long-running job to generate a complex financial report.
+      operationId: initiateReportGeneration
+      requestBody:
+        description: Parameters defining the scope of the report to be generated.
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                start_date:
+                  type: string
+                  format: date
+                  description: Start date for the report data (YYYY-MM-DD).
+                end_date:
+                  type: string
+                  format: date
+                  description: End date for the report data (YYYY-MM-DD).
+                format:
+                  type: string
+                  enum: [pdf, csv, json]
+                  default: csv
+                  description: Desired output file format.
+      
+      responses:
+        '202':
+          description: |
+            **Accepted.** The request for the report has been received and the job
+            is now queued for asynchronous processing. The client should monitor
+            the resource provided in the 'Location' header to check the job status.
+          headers:
+            Location:
+              description: URI of the newly created ReportJob resource.
+              schema:
+                type: string
+                example: '/v1/reports/345'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportJobStatus'
+        '400':
+          description: Bad Request - Invalid date range or unsupported format requested.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v1/reports/{job_id}:
+    get:
+      tags:
+        - Reports
+      summary: Retrieves the status or the result of a generated report job.
+      operationId: getReportJobStatus
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          description: Unique identifier for the long-running report job.
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: The job is complete. The response contains the file download link.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: complete
+                  file_url:
+                    type: string
+                    format: url
+                    description: The link to download the generated report file.
+        '200_Partial':
+          description: The job is still processing. Status details are provided.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportJobStatus'
+        '404':
+          description: Not Found - No job exists with the given ID.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    ReportJobStatus:
+      type: object
+      properties:
+        job_id:
+          type: integer
+        status:
+          type: string
+          enum: [queued, processing, complete, failed]
+          description: Current status of the report generation job.
+        progress_percent:
+          type: integer
+          description: Percentage completion, if available.
+          example: 65
+
+    ErrorResponse:
+      # (ErrorResponse definition would be here, as provided in the previous example)
+      type: object
+      properties:
+        status:
+          type: integer
+        title:
+          type: string
+        detail:
+          type: string
